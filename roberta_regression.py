@@ -22,7 +22,7 @@ device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Define constants
-OUTPUT_DIR = "friedman2_output"
+OUTPUT_DIR = "friedman2_dataset"
 MODEL_DIR = os.path.join(OUTPUT_DIR, "roberta_model")
 os.makedirs(MODEL_DIR, exist_ok=True)
 

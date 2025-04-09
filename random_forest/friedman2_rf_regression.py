@@ -14,8 +14,8 @@ import time
 np.random.seed(42)
 
 # Define constants
-OUTPUT_DIR = "friedman2_output"
-RF_DIR = "random_forest"
+OUTPUT_DIR = "friedman2_dataset"
+RF_DIR = "friedman2_rf_regression"
 os.makedirs(RF_DIR, exist_ok=True)
 
 def load_data():

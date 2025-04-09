@@ -20,8 +20,8 @@ logging.basicConfig(
 )
 
 # Constants
-OUTPUT_DIR = "random_forest"
-FRIEDMAN_OUTPUT_DIR = "friedman2_output"
+OUTPUT_DIR = "friedman2_rf_regression"
+FRIEDMAN_OUTPUT_DIR = "friedman2_dataset"
 RESULTS_DIR = os.path.join(OUTPUT_DIR, "uncertainty_results")
 PLOTS_DIR = os.path.join(RESULTS_DIR, "plots")
 MODEL_DIR = os.path.join(RESULTS_DIR, "models")

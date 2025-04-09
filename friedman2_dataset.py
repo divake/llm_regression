@@ -43,7 +43,7 @@ def generate_friedman2_dataset(n_samples=1000, noise=0.1, random_state=42):
 
 
 # Create output directory
-output_dir = "friedman2_output"
+output_dir = "friedman2_dataset"
 os.makedirs(output_dir, exist_ok=True)
 
 # Generate dataset
