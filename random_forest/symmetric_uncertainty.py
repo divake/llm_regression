@@ -51,73 +51,79 @@ def load_data():
     rf_model_path = os.path.join(OUTPUT_DIR, "random_forest_model.joblib")
     rf_model = joblib.load(rf_model_path)
     
-    # Load predictions from the RF model
-    predictions_path = os.path.join(OUTPUT_DIR, "rf_predictions.csv")
-    predictions_df = pd.read_csv(predictions_path)
-    
-    # Load original datasets to get features
+    # Load original datasets with the same split as used for training the RF model
     train_df = pd.read_csv(os.path.join(FRIEDMAN_OUTPUT_DIR, "train_data.csv"))
     val_df = pd.read_csv(os.path.join(FRIEDMAN_OUTPUT_DIR, "validation_data.csv"))
     test_df = pd.read_csv(os.path.join(FRIEDMAN_OUTPUT_DIR, "test_data.csv"))
     
-    # Combine for full dataset
-    all_dfs = pd.concat([train_df, val_df, test_df], ignore_index=True)
-    
-    logging.info(f"Loaded {len(all_dfs)} data points")
-    logging.info(f"Loaded {len(predictions_df)} predictions")
-    
-    return rf_model, predictions_df, all_dfs
-
-def create_torch_datasets(all_data, predictions_df):
-    """Create PyTorch datasets for training the scoring function"""
-    logging.info("Creating training, calibration, and test datasets...")
-    
-    # Extract predictions and targets
-    y_true = predictions_df['actual'].values
-    y_pred = predictions_df['predicted'].values
-    
-    # Compute absolute errors (input to the scoring function)
-    abs_errors = np.abs(y_true - y_pred).reshape(-1, 1)
-    
-    # Filter all_data to match predictions_df size
-    # Using the test data indices to match the data
-    test_indices = predictions_df.index.values
-    filtered_data = all_data.iloc[test_indices].reset_index(drop=True)
-    
-    logging.info(f"Filtered feature data from {len(all_data)} to {len(filtered_data)} records")
-    
-    # Features for potential feature-dependent analysis
+    # Feature names
     feature_names = ['x1', 'x2', 'x3', 'x4']
-    features = filtered_data[feature_names].values
     
-    # Verify the lengths match
-    if len(features) != len(y_true):
-        logging.error(f"Feature length ({len(features)}) doesn't match target length ({len(y_true)})")
-        raise ValueError("Data length mismatch after filtering")
+    # Extract features and targets from each dataset
+    X_train = train_df[feature_names].values
+    y_train = train_df['target'].values
     
-    # Split into train (60%), calibration (20%), and test (20%)
-    X_train, X_temp, y_train, y_temp, err_train, err_temp, feat_train, feat_temp = train_test_split(
-        y_pred, y_true, abs_errors, features, test_size=0.4, random_state=42
-    )
+    X_val = val_df[feature_names].values  # Validation data will be used for calibration
+    y_val = val_df['target'].values
     
-    X_cal, X_test, y_cal, y_test, err_cal, err_test, feat_cal, feat_test = train_test_split(
-        X_temp, y_temp, err_temp, feat_temp, test_size=0.5, random_state=42
-    )
+    X_test = test_df[feature_names].values
+    y_test = test_df['target'].values
+    
+    # Generate predictions for each dataset
+    y_train_pred = rf_model.predict(X_train)
+    y_val_pred = rf_model.predict(X_val)
+    y_test_pred = rf_model.predict(X_test)
+    
+    # Calculate absolute errors for each dataset
+    train_errors = np.abs(y_train - y_train_pred).reshape(-1, 1)
+    val_errors = np.abs(y_val - y_val_pred).reshape(-1, 1)
+    test_errors = np.abs(y_test - y_test_pred).reshape(-1, 1)
+    
+    logging.info(f"Loaded train: {len(train_df)}, validation: {len(val_df)}, test: {len(test_df)} data points")
+    
+    # Create data dictionaries
+    train_data = {
+        'features': X_train,
+        'targets': y_train,
+        'predictions': y_train_pred,
+        'errors': train_errors
+    }
+    
+    val_data = {
+        'features': X_val,
+        'targets': y_val,
+        'predictions': y_val_pred,
+        'errors': val_errors
+    }
+    
+    test_data = {
+        'features': X_test,
+        'targets': y_test,
+        'predictions': y_test_pred,
+        'errors': test_errors
+    }
+    
+    return rf_model, train_data, val_data, test_data, feature_names
+
+def create_torch_datasets(train_data, val_data, test_data):
+    """Create PyTorch datasets for training the scoring function using the original data splits"""
+    logging.info("Creating training, calibration, and test datasets...")
     
     # Create PyTorch TensorDatasets
     train_dataset = TensorDataset(
-        torch.tensor(err_train, dtype=torch.float32),
-        torch.tensor(y_train, dtype=torch.float32)
+        torch.tensor(train_data['errors'], dtype=torch.float32),
+        torch.tensor(train_data['targets'], dtype=torch.float32)
     )
     
+    # Use validation dataset as calibration dataset
     cal_dataset = TensorDataset(
-        torch.tensor(err_cal, dtype=torch.float32),
-        torch.tensor(y_cal, dtype=torch.float32)
+        torch.tensor(val_data['errors'], dtype=torch.float32),
+        torch.tensor(val_data['targets'], dtype=torch.float32)
     )
     
     test_dataset = TensorDataset(
-        torch.tensor(err_test, dtype=torch.float32),
-        torch.tensor(y_test, dtype=torch.float32)
+        torch.tensor(test_data['errors'], dtype=torch.float32),
+        torch.tensor(test_data['targets'], dtype=torch.float32)
     )
     
     # Create DataLoaders
@@ -137,9 +143,9 @@ def create_torch_datasets(all_data, predictions_df):
     
     # Store original data for later evaluation
     original_data = {
-        'train': (feat_train, y_train, X_train),
-        'cal': (feat_cal, y_cal, X_cal),
-        'test': (feat_test, y_test, X_test)
+        'train': (train_data['features'], train_data['targets'], train_data['predictions']),
+        'cal': (val_data['features'], val_data['targets'], val_data['predictions']),
+        'test': (test_data['features'], test_data['targets'], test_data['predictions'])
     }
     
     logging.info(f"Created datasets - Train: {len(train_dataset)}, Cal: {len(cal_dataset)}, Test: {len(test_dataset)}")
@@ -323,11 +329,11 @@ def main():
     logging.info("Starting symmetric uncertainty estimation")
     
     # Load data
-    rf_model, predictions_df, all_data = load_data()
+    rf_model, train_data, val_data, test_data, feature_names = load_data()
     
     # Create datasets
     train_loader, cal_loader, test_loader, original_data = create_torch_datasets(
-        all_data, predictions_df
+        train_data, val_data, test_data
     )
     
     # Train scoring function
