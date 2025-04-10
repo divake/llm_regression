@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 
 from regression_scoring_function import RegressionScoringMLP
 from regression_trainer import RegressionUncertaintyTrainer
-from regression_metrics import AverageMeter, evaluate_prediction_intervals
+from regression_metrics import AverageMeter, evaluate_prediction_intervals, compute_conformal_calibration
 
 # Configure logging
 logging.basicConfig(
@@ -324,6 +324,132 @@ def analyze_results():
     
     logging.info("Analysis complete!")
 
+def plot_scoring_function(scoring_fn, train_data, val_data, test_data, device, output_dir):
+    """
+    Plot the relationship between absolute errors and predicted widths
+    to visualize how the scoring function behaves after training.
+    
+    Args:
+        scoring_fn: Trained scoring function model
+        train_data: Training data dictionary
+        val_data: Validation/calibration data dictionary
+        test_data: Test data dictionary
+        device: Device to run inference on
+        output_dir: Output directory for saving plots
+    """
+    logging.info("Plotting scoring function behavior...")
+    
+    # Set model to evaluation mode
+    scoring_fn.eval()
+    
+    # Create a grid of potential error values to evaluate scoring function
+    min_error = min(
+        np.min(train_data['errors']),
+        np.min(val_data['errors']),
+        np.min(test_data['errors'])
+    )
+    
+    max_error = max(
+        np.max(train_data['errors']),
+        np.max(val_data['errors']),
+        np.max(test_data['errors'])
+    )
+    
+    # Create a fine-grained grid of errors for smooth curve
+    error_grid = np.linspace(min_error, max_error, 1000).reshape(-1, 1)
+    error_tensor = torch.tensor(error_grid, dtype=torch.float32, device=device)
+    
+    # Get predicted widths for the error grid
+    with torch.no_grad():
+        width_grid = scoring_fn(error_tensor).cpu().numpy()
+    
+    # Prepare actual data points
+    train_errors_flat = train_data['errors'].flatten()
+    val_errors_flat = val_data['errors'].flatten()
+    test_errors_flat = test_data['errors'].flatten()
+    
+    # Get predictions for actual data points
+    train_errors_tensor = torch.tensor(train_data['errors'], dtype=torch.float32, device=device)
+    val_errors_tensor = torch.tensor(val_data['errors'], dtype=torch.float32, device=device)
+    test_errors_tensor = torch.tensor(test_data['errors'], dtype=torch.float32, device=device)
+    
+    with torch.no_grad():
+        train_widths = scoring_fn(train_errors_tensor).cpu().numpy().flatten()
+        val_widths = scoring_fn(val_errors_tensor).cpu().numpy().flatten()
+        test_widths = scoring_fn(test_errors_tensor).cpu().numpy().flatten()
+    
+    # Create the figure
+    plt.figure(figsize=(12, 8))
+    
+    # Plot the function curve
+    plt.plot(error_grid, width_grid, 'r-', linewidth=2, label='Scoring Function')
+    
+    # Plot sample points
+    plt.scatter(train_errors_flat, train_widths, alpha=0.3, label='Training', color='blue')
+    plt.scatter(val_errors_flat, val_widths, alpha=0.3, label='Validation', color='green')
+    plt.scatter(test_errors_flat, test_widths, alpha=0.3, label='Test', color='purple')
+    
+    plt.xlabel('Absolute Error (Non-conformity Score)')
+    plt.ylabel('Predicted Width')
+    plt.title('Uncertainty Scoring Function: Mapping Errors to Prediction Widths')
+    plt.legend()
+    plt.grid(True)
+    
+    # Add linear fit line for reference
+    from sklearn.linear_model import LinearRegression
+    lr = LinearRegression()
+    lr.fit(error_grid, width_grid)
+    linear_pred = lr.predict(error_grid)
+    plt.plot(error_grid, linear_pred, 'g--', alpha=0.7, label=f'Linear Fit (slope={lr.coef_[0][0]:.4f})')
+    
+    # Add a histogram of errors as a subplot
+    ax_inset = plt.axes([0.2, 0.55, 0.25, 0.25])
+    ax_inset.hist(np.concatenate([train_errors_flat, val_errors_flat, test_errors_flat]), 
+                  bins=30, alpha=0.6, color='gray')
+    ax_inset.set_title('Distribution of Errors')
+    ax_inset.set_xlabel('Absolute Error')
+    ax_inset.set_ylabel('Frequency')
+    
+    # Save the plot
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'scoring_function_plot.png'), dpi=150)
+    plt.close()
+    
+    # Create a secondary plot showing the calibrated widths
+    # Compute calibration factor from validation set
+    
+    # Create tensor versions for calibration
+    val_errors_tensor = torch.tensor(val_errors_flat.reshape(-1, 1), dtype=torch.float32, device=device)
+    
+    # Compute calibration factor
+    cal_factor = compute_conformal_calibration(scoring_fn, val_errors_tensor, target_coverage=CONFIG['target_coverage'])
+    
+    # Convert calibration factor from tensor to float if needed
+    if isinstance(cal_factor, torch.Tensor):
+        cal_factor = cal_factor.item()
+    
+    # Plot calibrated widths
+    plt.figure(figsize=(12, 8))
+    plt.scatter(train_errors_flat, train_widths * cal_factor, alpha=0.3, label='Training', color='blue')
+    plt.scatter(val_errors_flat, val_widths * cal_factor, alpha=0.3, label='Validation', color='green')
+    plt.scatter(test_errors_flat, test_widths * cal_factor, alpha=0.3, label='Test', color='purple')
+    
+    plt.plot(error_grid, width_grid * cal_factor, 'r-', linewidth=2, 
+             label=f'Calibrated Scoring Function (factor={cal_factor:.4f})')
+    
+    plt.xlabel('Absolute Error (Non-conformity Score)')
+    plt.ylabel('Calibrated Width')
+    plt.title('Calibrated Uncertainty Estimates')
+    plt.legend()
+    plt.grid(True)
+    
+    # Save the calibrated plot
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'calibrated_widths_plot.png'), dpi=150)
+    plt.close()
+    
+    logging.info(f"Scoring function plots saved to {output_dir}")
+
 def main():
     """Main execution function"""
     logging.info("Starting symmetric uncertainty estimation")
@@ -343,6 +469,10 @@ def main():
     
     # Evaluate on original data
     metrics = evaluate_on_original_data(trainer, original_data)
+    
+    # Plot the scoring function behavior
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    plot_scoring_function(scoring_fn, train_data, val_data, test_data, device, RESULTS_DIR)
     
     # Analyze results 
     analyze_results()
