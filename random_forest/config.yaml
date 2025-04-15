@@ -1,0 +1,80 @@
+# Conformal Prediction Configuration
+
+# Paths
+paths:
+  data_dir: "data/"
+  output_dir: "results/"
+  model_dir: "models/"
+  friedman_data_dir: "friedman2_dataset/"  # Directory with Friedman dataset
+  plots_dir: "plots/"     # Directory for saving plots
+
+# Random Forest Model
+rf_model:
+  n_estimators: 100
+  max_depth: 10
+  min_samples_split: 2
+  min_samples_leaf: 1
+  max_features: null  # Default behavior uses all features
+  random_state: 42
+  oob_score: true
+
+# Scoring Function Options
+scoring_functions:
+  type: "learnable_mlp"  # Options: "learnable_mlp", "abs_residual", "squared_residual", "normalized_residual", "residual_mlp"
+  symmetric: true        # If false, use asymmetric intervals
+
+# MLP Architecture
+mlp:
+  input_dim: "auto"      # Will be set based on feature dimension
+  hidden_dims: [64, 32]  # Hidden layer dimensions
+  output_dim: 1          # For symmetric, 2 for asymmetric (lower, upper)
+  activation: "leaky_relu"  # Options: "relu", "leaky_relu", "sigmoid", "tanh"
+  final_activation: "softplus"  # Ensures positive outputs
+  dropout_rate: 0.2
+  batch_norm: true
+  l2_lambda: 1e-5        # L2 regularization strength
+  min_score: 0.01        # Minimum score to prevent degenerate intervals
+
+# Training Parameters
+training:
+  learning_rate: 1e-3
+  batch_size: 64
+  num_epochs: 50
+  target_coverage: 0.9   # Target coverage level (1-alpha)
+  coverage_weight: 1.0   # Weight for coverage loss
+  width_weight: 0.1      # Weight for width loss
+  grad_clip: 1.0         # Gradient clipping value
+  
+# Scheduler Parameters
+scheduler:
+  factor: 0.5            # Factor to reduce learning rate
+  patience: 5            # Patience for learning rate reduction
+  early_stop_patience: 10  # Early stopping patience
+  
+# Conformal Prediction Parameters
+conformal:
+  alpha: 0.1             # Significance level (1 - target_coverage)
+  calibration_split: 0.2  # Portion of data to use for calibration
+  
+# Evaluation
+evaluation:
+  metrics: ["coverage", "avg_width", "interval_score", "efficiency", "rmse", "mae", "width_error_corr", "sharpness"]
+  plot_results: true
+  save_intervals: true
+  num_bins: 10           # Number of bins for feature analysis plots
+  max_samples_plot: 500  # Maximum number of samples to include in prediction interval plots
+  
+# Data Processing
+data:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  normalize: true
+  feature_names: null    # Will be set based on dataset or defaults to ["x1", "x2", "x3", "x4"] for Friedman
+  seed: 42
+  
+# Hyperparameter Optimization (for RF model)
+hyperopt:
+  perform: false         # Whether to perform hyperparameter optimization
+  cv_folds: 5            # Number of cross-validation folds
+  scoring: "neg_root_mean_squared_error"  # Scoring metric for optimization 
