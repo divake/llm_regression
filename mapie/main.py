@@ -63,9 +63,23 @@ def main(config_path):
     evaluator = ConformalEvaluator(config)
     results = evaluator.evaluate(method, X_test, y_test)
     
-    # Save results
+    # Save results and create visualizations
     results_path = evaluator.save_results()
     logger.info(f"Results saved to {results_path}")
+    
+    # Explicitly generate and save prediction interval plot
+    plot_path = evaluator.plot_prediction_intervals()
+    logger.info(f"Visualization created at: {plot_path}")
+    
+    print("\nEvaluation Results:")
+    print(f"  Method: {results['method_name']}")
+    print(f"  Theoretical coverage: {results['theoretical_coverage']}")
+    print(f"  Empirical coverage: {results['empirical_coverage']:.4f}")
+    print(f"  Average interval width: {results['interval_width']:.4f}")
+    print(f"  Mean absolute error: {results['mae']:.4f}")
+    print(f"  Efficiency (width/MAE ratio): {results['efficiency']:.4f}")
+    print(f"  Prediction time: {results['prediction_time']:.4f} seconds")
+    print(f"\nPrediction interval plot saved to: {plot_path}")
     
     return results
 

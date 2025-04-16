@@ -55,15 +55,4 @@ class DataLoader:
         logger.info(f"Loading model from {self.config['data']['model_path']}...")
         model = joblib.load(self.config['data']['model_path'])
         logger.info(f"Loaded model: {type(model).__name__}")
-        return model
-    
-    def create_calibration_split(self, X_train, y_train, calib_size=0.25, random_state=42):
-        """
-        Create a split for calibration data from training data.
-        Only needed for methods that require explicit calibration data.
-        """
-        X_train_split, X_calib, y_train_split, y_calib = train_test_split(
-            X_train, y_train, test_size=calib_size, random_state=random_state
-        )
-        logger.info(f"Split training data for calibration: Train: {X_train_split.shape}, Calibration: {X_calib.shape}")
-        return X_train_split, X_calib, y_train_split, y_calib 
+        return model 
