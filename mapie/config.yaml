@@ -1,0 +1,29 @@
+# Conformal Prediction Configuration
+experiment_name: "friedman2_absolute_naive"
+
+# Paths
+data:
+  train_path: "/ssd_4TB/divake/CP_llm/friedman2_dataset/train_data.csv"
+  validation_path: "/ssd_4TB/divake/CP_llm/friedman2_dataset/validation_data.csv"
+  test_path: "/ssd_4TB/divake/CP_llm/friedman2_dataset/test_data.csv"
+  model_path: "/ssd_4TB/divake/CP_llm/friedman2_rf_regression/random_forest_model.joblib"
+  
+# Conformal Prediction Parameters
+conformal_prediction:
+  alpha: 0.1  # For 90% confidence level
+  scoring_function: "absolute_residual"  # Options: absolute_residual, gamma, residual_normalized
+  method: "naive"  # Options: naive, split, jackknife, jackknife_plus, jackknife_minmax, cv, cv_plus, cv_minmax, jackknife_plus_ab, cqr
+  
+# Evaluation Metrics
+evaluation:
+  metrics:
+    - "theoretical_coverage"
+    - "empirical_coverage"
+    - "interval_width"
+    - "training_cost"
+    - "evaluation_cost"
+  
+# Output
+output:
+  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results"
+  log_level: "INFO" 
