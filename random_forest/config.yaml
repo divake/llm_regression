@@ -22,18 +22,19 @@ rf_model:
 scoring_functions:
   type: "learnable_mlp"  # Options: "learnable_mlp", "abs_residual", "squared_residual", "normalized_residual", "residual_mlp"
   symmetric: true        # If false, use asymmetric intervals
+  include_prediction: true  # Include base model prediction as input feature to the MLP
 
 # MLP Architecture
 mlp:
   input_dim: "auto"      # Will be set based on feature dimension
-  hidden_dims: [64, 32]  # Hidden layer dimensions
+  hidden_dims: [128, 64, 32, 16]  # Hidden layer dimensions
   output_dim: 1          # For symmetric, 2 for asymmetric (lower, upper)
   activation: "leaky_relu"  # Options: "relu", "leaky_relu", "sigmoid", "tanh"
   final_activation: "softplus"  # Ensures positive outputs
   dropout_rate: 0.2
   batch_norm: true
   l2_lambda: 1e-5        # L2 regularization strength
-  min_score: 0.01        # Minimum score to prevent degenerate intervals
+  min_score: 0.05        # Minimum score to prevent degenerate intervals
 
 # Training Parameters
 training:
@@ -41,7 +42,7 @@ training:
   batch_size: 64
   num_epochs: 50
   target_coverage: 0.9   # Target coverage level (1-alpha)
-  coverage_weight: 1.0   # Weight for coverage loss
+  coverage_weight: 20.0   # Weight for coverage loss
   width_weight: 0.1      # Weight for width loss
   grad_clip: 1.0         # Gradient clipping value
   
@@ -54,7 +55,7 @@ scheduler:
 # Conformal Prediction Parameters
 conformal:
   alpha: 0.1             # Significance level (1 - target_coverage)
-  calibration_split: 0.2  # Portion of data to use for calibration
+  safety_margin: 1.1     # Safety margin for calibration factor
   
 # Evaluation
 evaluation:
@@ -66,10 +67,11 @@ evaluation:
   
 # Data Processing
 data:
-  train_ratio: 0.7
-  val_ratio: 0.15
-  test_ratio: 0.15
+  train_ratio: 0.6
+  val_ratio: 0.2
+  test_ratio: 0.2
   normalize: true
+  add_interactions: true   # Add feature interaction terms
   feature_names: null    # Will be set based on dataset or defaults to ["x1", "x2", "x3", "x4"] for Friedman
   seed: 42
   

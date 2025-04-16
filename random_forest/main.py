@@ -54,6 +54,16 @@ def setup_environment(config):
     os.makedirs(config['paths']['output_dir'], exist_ok=True)
     os.makedirs(config['paths']['model_dir'], exist_ok=True)
     
+    # Check if Friedman dataset directory exists
+    friedman_dir = config['paths']['friedman_data_dir']
+    if not os.path.exists(friedman_dir):
+        logging.warning(f"Friedman dataset directory {friedman_dir} does not exist. Creating it...")
+        os.makedirs(friedman_dir, exist_ok=True)
+        
+        # Provide instruction to user if directory was just created
+        logging.warning(f"Please ensure Friedman dataset files are placed in {friedman_dir} directory.")
+        logging.warning("Expected files: train_data.csv, validation_data.csv, test_data.csv")
+    
     # Set up logging
     log_file = os.path.join(config['paths']['output_dir'], 'training.log')
     logging.basicConfig(
