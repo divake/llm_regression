@@ -12,13 +12,25 @@ from evaluation import ConformalEvaluator
 
 def main(config_path):
     """
-    Run the conformal prediction pipeline.
+    Run the conformal prediction pipeline with the split method.
     
     Parameters
     ----------
     config_path : str
         Path to the configuration file.
+        
+    Returns
+    -------
+    dict
+        Dictionary with evaluation results.
     """
+    # Ensure config_path is an absolute path
+    if not os.path.isabs(config_path):
+        # If it's a relative path, make it relative to the current working directory
+        config_path = os.path.abspath(config_path)
+    
+    print(f"Using configuration file: {config_path}")
+    
     # Load configuration
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -46,13 +58,18 @@ def main(config_path):
     score_name = config['conformal_prediction']['scoring_function']
     conformity_score = get_conformity_score(score_name)
     
-    # Get conformal method
-    method_name = config['conformal_prediction']['method']
+    # Always use split method
+    method_name = "split"
+    logger.info(f"Running the split method")
+    
+    # Get method parameters
     alpha = config['conformal_prediction']['alpha']
+    
+    # Get the conformal method
     method = get_conformal_method(method_name, model, conformity_score, alpha)
     
     # Calibrate the method
-    logger.info(f"Calibrating {method_name} method...")
+    logger.info(f"Calibrating split method...")
     start_time = time.time()
     method.calibrate(X_train, y_train, X_val, y_val)
     calibration_time = time.time() - start_time
@@ -67,7 +84,7 @@ def main(config_path):
     results_path = evaluator.save_results()
     logger.info(f"Results saved to {results_path}")
     
-    # Explicitly generate and save prediction interval plot
+    # Generate and save prediction interval plot
     plot_path = evaluator.plot_prediction_intervals()
     logger.info(f"Visualization created at: {plot_path}")
     
@@ -86,10 +103,17 @@ def main(config_path):
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description='Run conformal prediction experiment')
+    parser = argparse.ArgumentParser(description='Run conformal prediction experiment with the split method')
     parser.add_argument('--config', type=str, default='config.yaml',
                         help='Path to configuration file')
     
     args = parser.parse_args()
     
-    main(args.config) 
+    # Convert relative path to absolute path if needed
+    config_path = args.config
+    if not os.path.isabs(config_path):
+        # Get the directory of the script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, config_path)
+    
+    main(config_path)

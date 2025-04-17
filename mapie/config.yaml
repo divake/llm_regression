@@ -1,5 +1,5 @@
 # Conformal Prediction Configuration
-experiment_name: "friedman2_absolute_naive"
+experiment_name: "friedman2_absolute_split_method"
 
 # Paths
 data:
@@ -12,7 +12,6 @@ data:
 conformal_prediction:
   alpha: 0.1  # For 90% confidence level
   scoring_function: "absolute_residual"  # Options: absolute_residual, gamma, residual_normalized
-  method: "naive"  # Options: naive, split, jackknife, jackknife_plus, jackknife_minmax, cv, cv_plus, cv_minmax, jackknife_plus_ab, cqr
   
 # Evaluation Metrics
 evaluation:
@@ -25,5 +24,5 @@ evaluation:
   
 # Output
 output:
-  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results"
+  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results/split_method"
   log_level: "INFO" 

@@ -2,7 +2,6 @@ import numpy as np
 import time
 from abc import ABC, abstractmethod
 import logging
-from sklearn.model_selection import KFold
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +103,8 @@ class ConformalMethod(ABC):
         pass
 
 
-class NaiveMethod(ConformalMethod):
-    """Implementation of the naive conformal prediction method."""
+class SplitMethod(ConformalMethod):
+    """Implementation of the split conformal prediction method."""
     
     def __init__(self, model, conformity_score, alpha=0.1):
         super().__init__(model, conformity_score, alpha)
@@ -115,34 +114,27 @@ class NaiveMethod(ConformalMethod):
         """
         Calibrate the method using validation data.
         
-        Using separate validation data for calibration provides valid coverage guarantees.
-        If validation data is not provided, falls back to using training data (which may
-        lead to underestimation of prediction intervals).
+        The split method requires a separate calibration dataset (validation data)
+        to compute residuals and quantiles, providing valid coverage guarantees.
         """
         start_time = time.time()
         
-        # Use validation data for calibration if available
-        if X_val is not None and y_val is not None:
-            logger.info("Using validation data for calibration")
-            # Make predictions on validation data
-            y_pred = self.model.predict(X_val)
-            
-            # Compute conformity scores
-            scores = self.conformity_score.compute(y_val, y_pred)
-        else:
-            logger.warning("Validation data not provided. Using training data for calibration. "
-                          "This may lead to underestimated prediction intervals.")
-            # Make predictions on training data
-            y_pred = self.model.predict(X_train)
-            
-            # Compute conformity scores
-            scores = self.conformity_score.compute(y_train, y_pred)
+        if X_val is None or y_val is None:
+            raise ValueError("Split method requires validation data for calibration. "
+                            "Please provide X_val and y_val.")
+        
+        logger.info("Using validation data for calibration (split method)")
+        # Make predictions on validation data
+        y_pred = self.model.predict(X_val)
+        
+        # Compute conformity scores
+        scores = self.conformity_score.compute(y_val, y_pred)
         
         # Calculate the quantile for the prediction intervals
         self.quantile = np.quantile(scores, 1 - self.alpha)
         
         calibration_time = time.time() - start_time
-        logger.info(f"Naive method calibration completed in {calibration_time:.2f} seconds")
+        logger.info(f"Split method calibration completed in {calibration_time:.2f} seconds")
         logger.info(f"Calibrated quantile: {self.quantile:.4f}")
         
         return self
@@ -167,27 +159,26 @@ class NaiveMethod(ConformalMethod):
     @property
     def theoretical_coverage(self):
         """
-        When using proper validation data for calibration, the theoretical
-        coverage is 1-alpha. Otherwise, there's no guarantee.
+        When using a proper validation set, the theoretical coverage is ≥ 1-alpha.
         """
-        return f"{1 - self.alpha} (with proper validation data)"
+        return f"≥ {1 - self.alpha} (asymptotic guarantee)"
     
     def training_cost(self, n_samples):
         """
-        Training cost of the naive method is just 1 model fit.
+        Training cost of the split method is just 1 model fit.
         """
         return 1
     
     def evaluation_cost(self, n_train, n_test):
         """
-        Evaluation cost of the naive method is just the cost of making
+        Evaluation cost of the split method is just the cost of making
         predictions on the test set.
         """
         return f"{n_test}"
 
 
 # Factory function to get the appropriate conformal method
-def get_conformal_method(method_name, model, conformity_score, alpha=0.1):
+def get_conformal_method(method_name, model, conformity_score, alpha=0.1, **kwargs):
     """
     Factory function to get the conformal method by name.
     
@@ -208,12 +199,11 @@ def get_conformal_method(method_name, model, conformity_score, alpha=0.1):
         Instance of the conformal method.
     """
     methods = {
-        'naive': NaiveMethod(model, conformity_score, alpha),
-        # Add more methods when implementing them
+        'split': SplitMethod(model, conformity_score, alpha)
     }
     
     if method_name not in methods:
-        raise ValueError(f"Unknown conformal method: {method_name}")
+        raise ValueError(f"Unknown conformal method: {method_name}. Available methods: {list(methods.keys())}")
     
     logger.info(f"Using conformal method: {method_name}")
     return methods[method_name] 
