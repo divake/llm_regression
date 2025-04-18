@@ -1,5 +1,5 @@
 # Conformal Prediction Configuration
-experiment_name: "friedman2_cqr_method"
+experiment_name: "friedman2_lightgbm_cqr_method"
 
 # Paths
 data:
@@ -10,11 +10,11 @@ data:
   
 # Conformal Prediction Parameters
 conformal_prediction:
-  # Main method selection
-  method: "cqr"  # Using CQR method instead of split
+  # Method selection
+  method: "cqr"
   alpha: 0.1  # Significance level (1-alpha = coverage level)
   
-  # Scoring function for CQR will be automatically set
+  # Scoring function for CQR
   scoring_function: "quantile_residual"
   
   # CQR specific parameters
@@ -22,7 +22,19 @@ conformal_prediction:
   high_quantile: 0.95  # Upper quantile level (1-alpha/2)
 
 # Quantile Model Parameters for CQR
-quantile_model_type: "quantile_regressor"  # Options: quantile_regressor, gradient_boosting
+quantile_model_type: "lightgbm"  # Using LightGBM for quantile regression
+lightgbm_params:
+  objective: "quantile"
+  metric: "quantile"
+  verbosity: -1
+  boosting_type: "gbdt"
+  num_leaves: 31
+  learning_rate: 0.05
+  feature_fraction: 0.9
+  bagging_fraction: 0.8
+  bagging_freq: 5
+  n_estimators: 500
+  random_state: 42
 
 # If true, will attempt to load existing quantile models rather than training new ones
 use_existing_quantile_models: false
@@ -38,5 +50,5 @@ evaluation:
   
 # Output
 output:
-  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results/cqr_method"
+  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results/lightgbm_cqr_method"
   log_level: "INFO"
