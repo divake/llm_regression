@@ -137,6 +137,10 @@ def main(config_path):
         symmetric = method_name == "cqr_symmetric"
         score_name = 'quantile_residual_symmetric' if symmetric else 'quantile_residual'
         
+        # Load the original Random Forest model for point predictions
+        logger.info("Loading the original Random Forest model for point predictions")
+        base_model = data_loader.load_model()
+        
         # Check if we need to train models or load existing ones
         use_existing_models = config.get('use_existing_quantile_models', False)
         models_dir = os.path.dirname(config['output']['results_dir'])
@@ -164,7 +168,7 @@ def main(config_path):
         conformity_score = get_conformity_score(score_name)
         
         # Additional parameters
-        kwargs = {}
+        kwargs = {'base_model': base_model}  # Pass the base model for point predictions
         if 'low_quantile' in config['conformal_prediction']:
             kwargs['low_quantile'] = config['conformal_prediction']['low_quantile']
         if 'high_quantile' in config['conformal_prediction']:

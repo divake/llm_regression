@@ -180,7 +180,7 @@ class SplitMethod(ConformalMethod):
 class CQRMethod(ConformalMethod):
     """Implementation of the Conformalized Quantile Regression (CQR) method."""
     
-    def __init__(self, model, conformity_score, alpha=0.1, low_quantile=None, high_quantile=None):
+    def __init__(self, model, conformity_score, alpha=0.1, low_quantile=None, high_quantile=None, base_model=None):
         """
         Initialize the CQR method.
         
@@ -197,6 +197,9 @@ class CQRMethod(ConformalMethod):
             Lower quantile level used in training the quantile regressors.
         high_quantile : float, optional, default=1-alpha/2
             Upper quantile level used in training the quantile regressors.
+        base_model : object, optional
+            The base model to use for point predictions. If None, point predictions
+            will be calculated as the average of quantile predictions.
         """
         # For CQR, the model should be a tuple of two quantile regressors
         if not isinstance(model, tuple) or len(model) != 2:
@@ -211,6 +214,9 @@ class CQRMethod(ConformalMethod):
         # Unpack the models
         self.low_quantile_model, self.high_quantile_model = model
         
+        # Store the base model for point predictions if provided
+        self.base_model = base_model
+        
         # Set the quantile levels if not provided
         self.low_quantile = low_quantile if low_quantile is not None else alpha / 2
         self.high_quantile = high_quantile if high_quantile is not None else 1 - alpha / 2
@@ -218,6 +224,7 @@ class CQRMethod(ConformalMethod):
         # Initialize variables for storing calibration results
         self.low_quantile_value = None
         self.high_quantile_value = None
+        self.quantile_value = None
     
     def calibrate(self, X_train, y_train, X_val=None, y_val=None):
         """
@@ -304,8 +311,15 @@ class CQRMethod(ConformalMethod):
         y_pred_low = self.low_quantile_model.predict(X)
         y_pred_high = self.high_quantile_model.predict(X)
         
-        # Calculate center predictions (for return value only, not used in intervals)
-        y_pred = (y_pred_low + y_pred_high) / 2
+        # Calculate center predictions
+        if self.base_model is not None:
+            # Use the base model for point predictions if provided
+            y_pred = self.base_model.predict(X)
+            logger.info("Using base model for point predictions")
+        else:
+            # Fall back to average of quantile predictions if no base model
+            y_pred = (y_pred_low + y_pred_high) / 2
+            logger.info("Using average of quantile predictions for point predictions")
         
         # Compute prediction intervals
         if self.conformity_score.is_symmetric:
