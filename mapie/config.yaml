@@ -1,5 +1,5 @@
 # Conformal Prediction Configuration
-experiment_name: "friedman2_absolute_split_method"
+experiment_name: "friedman2_cqr_method"
 
 # Paths
 data:
@@ -10,8 +10,22 @@ data:
   
 # Conformal Prediction Parameters
 conformal_prediction:
-  alpha: 0.1  # For 90% confidence level
-  scoring_function: "absolute_residual"  # Options: absolute_residual, gamma, residual_normalized
+  # Main method selection
+  method: "cqr"  # Using CQR method instead of split
+  alpha: 0.1  # Significance level (1-alpha = coverage level)
+  
+  # Scoring function for CQR will be automatically set
+  scoring_function: "quantile_residual"
+  
+  # CQR specific parameters
+  low_quantile: 0.05  # Lower quantile level (alpha/2)
+  high_quantile: 0.95  # Upper quantile level (1-alpha/2)
+
+# Quantile Model Parameters for CQR
+quantile_model_type: "quantile_regressor"  # Options: quantile_regressor, gradient_boosting
+
+# If true, will attempt to load existing quantile models rather than training new ones
+use_existing_quantile_models: false
   
 # Evaluation Metrics
 evaluation:
@@ -24,5 +38,5 @@ evaluation:
   
 # Output
 output:
-  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results/split_method"
-  log_level: "INFO" 
+  results_dir: "/ssd_4TB/divake/CP_llm/mapie/results/cqr_method"
+  log_level: "INFO"
